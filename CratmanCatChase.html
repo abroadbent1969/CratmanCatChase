@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartman Cat Chase</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 608px;
+            height: 608px;
+            background-color: #000;
+            border: 2px solid #fff;
+        }
+        #game-canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #score {
+            position: absolute;
+            top: 0px;
+            left: 10px;
+            color: white;
+            font-size: 24px;
+            z-index: 2;
+        }
+        #lives {
+            position: absolute;
+            top: 0px;
+            right: 10px;
+            color: white;
+            font-size: 24px;
+            z-index: 2;
+        }
+        #start-screen {
+            display: block; /* Visible initially */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, 138%);
+            color: white;
+            font-size: 30px;
+            z-index: 2;
+        }
+        .burger {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: url('images/eric_cartman.png') no-repeat center;
+            background-size: contain;
+            z-index: 2;
+        }
+        .enemy {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: url('images/cat.png') no-repeat center;
+            background-size: contain;
+            transition: background 0.2s ease;
+            z-index: 2;
+        }
+        .enemy-vulnerable {
+            background: url('images/cat-sleep.png') no-repeat center !important;
+            background-size: contain !important;
+            opacity: 0.8;
+            transition: background 0.2s ease, opacity 0.2s ease;
+        }
+        .turtle {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: url('images/turtle.png') no-repeat center;
+            background-size: contain;
+            z-index: 2;
+        }
+		.cop-overlay {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			background: url('images/cartman_cop.png') no-repeat center;
+			background-size: contain;
+			z-index: 3;
+			animation: startgameFadeOut 3s ease-in-out forwards;
+		}
+		.startgame-overlay {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			background: url('images/StartGame.png') no-repeat center;
+			background-size: contain;
+			z-index: 3;
+			animation: startgameFadeOut 3s ease-in-out forwards;
+		}
+        .gameover-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: url('images/GameOver.png') no-repeat center;
+            background-size: contain;
+            z-index: 3;
+            opacity: 1;
+            animation: gameoverAnimation 2s ease-in forwards;
+        }
+        .points-overlay {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: url('images/points-100.png') no-repeat center;
+            background-size: contain;
+            z-index: 3;
+            animation: pointsAnimation 3s ease-in-out forwards;
+        }
+        .poof-overlay {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: url('images/poof.png') no-repeat center;
+            background-size: contain;
+            z-index: 3;
+            animation: poofAnimation 3s ease-in-out forwards;
+        }
+        @keyframes pointsAnimation {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(2);
+            }
+        }
+        @keyframes poofAnimation {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(2);
+            }
+        }
+		@keyframes startgameFadeOut {
+			0% {
+				opacity: 1;
+			}
+			100% {
+				opacity: 0;
+			}
+		}
+		@keyframes gameoverAnimation {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="608" height="608"></canvas>
+        <div id="score">Score: 0</div>
+        <div id="lives">Lives: 3</div>
+        <div id="start-screen">Use The Arrow Keys</div>
+        <div id="burger" class="burger"></div>
+        <div id="enemy1" class="enemy"></div>
+        <div id="enemy2" class="enemy"></div>
+        <div id="enemy3" class="enemy"></div>
+        <div id="enemy4" class="enemy"></div>
+        <div id="turtle" class="turtle"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const burger = document.getElementById('burger');
+        const enemies = [
+            document.getElementById('enemy1'),
+            document.getElementById('enemy2'),
+            document.getElementById('enemy3'),
+            document.getElementById('enemy4')
+        ];
+        const turtle = document.getElementById('turtle');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const startScreen = document.getElementById('start-screen');
+        const gameContainer = document.getElementById('game-container');
+
+        // Preload images with error handling
+        const powerUpImage = new Image();
+        powerUpImage.src = 'images/pie.png';
+        powerUpImage.onerror = () => console.error('Failed to load power-up image');
+        powerUpImage.onload = () => console.log('Power-up image loaded');
+
+        const prizeImage = new Image();
+        prizeImage.src = 'images/polly.png';
+        prizeImage.onerror = () => console.error('Failed to load prize image');
+        prizeImage.onload = () => console.log('Prize image loaded');
+
+        const specialPrizeImage = new Image();
+        specialPrizeImage.src = 'images/flower-pot.png';
+        specialPrizeImage.onerror = () => console.error('Failed to load special-prize image');
+        specialPrizeImage.onload = () => console.log('Special-prize image loaded');
+
+        const turtleImage = new Image();
+        turtleImage.src = 'images/turtle.png';
+        turtleImage.onerror = () => console.error('Failed to load turtle image');
+        turtleImage.onload = () => console.log('Turtle image loaded');
+
+        const pointsOverlayImage = new Image();
+        pointsOverlayImage.src = 'images/points-100.png';
+        pointsOverlayImage.onerror = () => console.error('Failed to load points overlay image');
+        pointsOverlayImage.onload = () => console.log('Points overlay image loaded');
+
+        const poofOverlayImage = new Image();
+        poofOverlayImage.src = 'images/poof.png';
+        poofOverlayImage.onerror = () => console.error('Failed to load poof overlay image');
+        poofOverlayImage.onload = () => console.log('Poof overlay image loaded');
+
+        const gameoverOverlayImage = new Image();
+        gameoverOverlayImage.src = 'images/GameOver.png';
+        gameoverOverlayImage.onerror = () => console.error('Failed to load Game Over overlay image');
+        gameoverOverlayImage.onload = () => console.log('Game Over overlay image loaded');
+		
+		const startgameOverlayImage = new Image();
+        startgameOverlayImage.src = 'images/StartGame.png';
+        startgameOverlayImage.onerror = () => console.error('Failed to load Start Game overlay image');
+        startgameOverlayImage.onload = () => console.log('Start Game overlay image loaded');
+
+        // Preload audio files
+        const startSound = new Audio('sounds/start.wav');
+        const pelletSound = new Audio('sounds/pellet.wav');
+        const powerUpSound = new Audio('sounds/powerup.wav');
+        const specialPrizeSound = new Audio('sounds/specialPrize.wav');
+        const dogbarkSound = new Audio('sounds/no_kitty.wav');
+        const catmeowSound = new Audio('sounds/meow.wav');
+        const burpSound = new Audio('sounds/pie.wav');
+        const alrightSound = new Audio('sounds/alright-voice-cartoon.wav');
+        const deadSound = new Audio('sounds/dead.wav');
+		const heySound = new Audio('sounds/hey.wav');
+		const homeSound = new Audio('sounds/home.wav');
+		const ballsSound = new Audio('sounds/balls.wav');
+		const respectSound = new Audio('sounds/respect.wav');
+		const hippySound = new Audio('sounds/hippy.wav');
+		const crashSound = new Audio('sounds/crash.wav');
+
+        // Handle audio loading errors
+        startSound.onerror = () => console.error('Failed to load start.wav');
+        pelletSound.onerror = () => console.error('Failed to load pellet.wav');
+        powerUpSound.onerror = () => console.error('Failed to load powerup.wav');
+        specialPrizeSound.onerror = () => console.error('Failed to load special-prize.wav');
+        catmeowSound.onerror = () => console.error('Failed to load cat-meow.wav');
+        burpSound.onerror = () => console.error('Failed to load burp.wav');
+        dogbarkSound.onerror = () => console.error('Failed to load dog-bark.wav');
+        deadSound.onerror = () => console.error('Failed to load dead.wav');
+		heySound.onerror = () => console.error('Failed to load hey.wav');
+		homeSound.onerror = () => console.error('Failed to load home.wav');
+	    ballsSound.onerror = () => console.error('Failed to load balls.wav');
+		respectSound.onerror = () => console.error('Failed to load respect.wav');
+		hippySound.onerror = () => console.error('Failed to load hippy.wav');
+		crashSound.onerror = () => console.error('Failed to load crash.wav');
+
+        // Game settings
+        const tileSize = 32;
+        const mapWidth = 19;
+        const mapHeight = 19;
+        let score = 0;
+        let lives = 3;
+        let gameOver = false;
+        let level = 1;
+        let ghostSpeed = 0.02;
+        let powerUpActive = false;
+        let powerUpTimer = null;
+        let enemiesPaused = false;
+        let prizeActive = false;
+        let prizeTimer = null;
+        let specialPrizeActive = false;
+        let specialPrizeTimer = null;
+        let turtleActive = false;
+        let turtleX = 0;
+        let turtleY = 0;
+        const turtleSpeed = 0.01;
+        let turtleTimer = null;
+        let enemyReleaseTimes = [2000, 4000, 6000, 8000];
+        let enemiesReleased = [false, false, false, false];
+
+        // Game map (0: path, 1: wall, 2: pellet, 3: power-up, 4: prize, 5: special prize)
+        let map = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,2,1],
+            [1,2,2,2,2,1,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,1,1,1,2,1,1,1,1,1,1,1,1,1,2,1,1,1,1],
+            [1,2,2,2,2,2,2,2,1,0,0,1,2,2,2,2,2,2,1],
+            [1,2,1,1,1,1,1,2,1,0,0,1,2,1,1,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,5,2,2,2,2,2,2,2,2,1],
+            [1,1,1,1,2,1,1,1,1,1,1,1,1,1,2,1,1,1,1],
+            [1,2,2,2,2,2,2,2,2,4,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        // Player position
+        let burgerX = 9 * tileSize;
+        let burgerY = 15 * tileSize;
+
+        // Enemy positions
+        let enemyPositions = [
+            { x: 9 * tileSize, y: 8 * tileSize },
+            { x: 10 * tileSize, y: 8 * tileSize },
+            { x: 9 * tileSize, y: 9 * tileSize },
+            { x: 10 * tileSize, y: 9 * tileSize }
+        ];
+        const initialEnemyPositions = [
+            { x: 9 * tileSize, y: 8 * tileSize },
+            { x: 10 * tileSize, y: 8 * tileSize },
+            { x: 9 * tileSize, y: 9 * tileSize },
+            { x: 10 * tileSize, y: 9 * tileSize }
+        ];
+
+        // Function to create points overlay
+        function createPointsOverlay(x, y) {
+            const overlay = document.createElement('div');
+            overlay.className = 'points-overlay';
+            overlay.style.left = `${x}px`;
+            overlay.style.top = `${y}px`;
+            gameContainer.appendChild(overlay);
+            setTimeout(() => {
+                overlay.remove();
+            }, 3000);
+        }
+
+        // Function to create poof overlay
+        function createPoofOverlay(x, y) {
+            const overlay = document.createElement('div');
+            overlay.className = 'poof-overlay';
+            overlay.style.left = `${x}px`;
+            overlay.style.top = `${y}px`;
+            gameContainer.appendChild(overlay);
+            setTimeout(() => {
+                overlay.remove();
+            }, 3000);
+        }
+		
+		// Function to create Cartman Cop overlay
+		function createCopOverlay() {
+			const overlay = document.createElement('div');
+			overlay.className = 'cop-overlay';
+			gameContainer.appendChild(overlay);
+			setTimeout(() => {
+				overlay.remove();
+			}, 5000);
+		}
+
+		// Function to create Start Game overlay
+		function createStartGameOverlay() {
+			const overlay = document.createElement('div');
+			overlay.className = 'startgame-overlay';
+			gameContainer.appendChild(overlay);
+			setTimeout(() => {
+				overlay.remove();
+			}, 5000);
+		}
+		
+        // Function to create game over overlay
+        function createGameOverOverlay() {
+            const overlay = document.createElement('div');
+            overlay.className = 'gameover-overlay';
+            gameContainer.appendChild(overlay);
+        }
+
+        // Draw the map
+        function drawMap() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for (let y = 0; y < mapHeight; y++) {
+                for (let x = 0; x < mapWidth; x++) {
+                    if (map[y][x] === 1) {
+                        ctx.fillStyle = 'blue';
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    } else if (map[y][x] === 2) {
+                        ctx.fillStyle = 'yellow';
+                        ctx.beginPath();
+                        ctx.arc(x * tileSize + tileSize / 2, y * tileSize + tileSize / 2, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (map[y][x] === 3) {
+                        if (powerUpImage.complete && powerUpImage.naturalWidth !== 0) {
+                            ctx.drawImage(powerUpImage, x * tileSize, y * tileSize, tileSize, tileSize);
+                        } else {
+                            ctx.fillStyle = 'red';
+                            ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                        }
+                    } else if (map[y][x] === 4 && prizeActive) {
+                        if (prizeImage.complete && prizeImage.naturalWidth !== 0) {
+                            ctx.drawImage(prizeImage, x * tileSize, y * tileSize, tileSize, tileSize);
+                        } else {
+                            ctx.fillStyle = 'gold';
+                            ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                        }
+                    } else if (map[y][x] === 5 && specialPrizeActive) {
+                        if (specialPrizeImage.complete && specialPrizeImage.naturalWidth !== 0) {
+                            ctx.drawImage(specialPrizeImage, x * tileSize, y * tileSize, tileSize, tileSize);
+                        } else {
+                            ctx.fillStyle = 'purple';
+                            ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                        }
+                    }
+                }
+            }
+            console.log('Map drawn');
+        }
+
+        // Update plant position
+        function updateBurger() {
+            burger.style.left = burgerX + 'px';
+            burger.style.top = burgerY + 'px';
+        }
+
+        // Update enemy positions
+        function updateEnemies() {
+            enemies.forEach((enemy, index) => {
+                enemy.style.left = enemyPositions[index].x + 'px';
+                enemy.style.top = enemyPositions[index].y + 'px';
+                enemy.className = 'enemy' + (powerUpActive ? ' enemy-vulnerable' : '');
+            });
+        }
+
+        // Update turtle position
+        function updateTurtle() {
+            if (turtleActive) {
+                turtle.style.left = turtleX + 'px';
+                turtle.style.top = turtleY + 'px';
+                turtle.style.display = 'block';
+            } else {
+                turtle.style.display = 'none';
+            }
+        }
+
+        // Helper function to check for enemy collisions
+        function checkEnemyCollision(playerX, playerY) {
+            for (let index = 0; index < enemies.length; index++) {
+                if (!enemiesReleased[index]) continue;
+                if (Math.abs(enemyPositions[index].x - playerX) < tileSize / 2 &&
+                    Math.abs(enemyPositions[index].y - playerY) < tileSize / 2) {
+                    if (powerUpActive) {
+                        score += 100;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        createPointsOverlay(enemyPositions[index].x, enemyPositions[index].y);
+                        enemyPositions[index] = { ...initialEnemyPositions[index] };
+                        enemiesReleased[index] = false;
+                        setTimeout(() => {
+                            enemiesReleased[index] = true;
+                            console.log(`Enemy ${index + 1} respawned`);
+                        }, enemyReleaseTimes[index]);
+                        catmeowSound.currentTime = 0;
+                        catmeowSound.play().catch(e => console.error('Error playing power-up sound:', e));
+                        return true;
+                    } else {
+                        lives--;
+                        livesDisplay.textContent = `Lives: ${lives}`;
+                        createPoofOverlay(enemyPositions[index].x, enemyPositions[index].y);
+                        heySound.currentTime = 0;
+                        heySound.play().catch(e => console.error('Error playing hey sound:', e));
+                        if (lives <= 0) {
+							homeSound.currentTime = 0;
+							homeSound.play().catch(e => console.error('Error playing home sound:', e));
+							createGameOverOverlay();
+							gameOver = true;
+                        } else {
+                            resetAfterDeath();
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Move enemies
+        function moveEnemies() {
+            if (enemiesPaused) return;
+            enemies.forEach((enemy, index) => {
+                if (!enemiesReleased[index]) return;
+                if (Math.random() < ghostSpeed) {
+                    const directions = [
+                        { dx: tileSize, dy: 0 },
+                        { dx: -tileSize, dy: 0 },
+                        { dx: 0, dy: tileSize },
+                        { dx: 0, dy: -tileSize }
+                    ];
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const newX = enemyPositions[index].x + dir.dx;
+                    const newY = enemyPositions[index].y + dir.dy;
+                    const mapX = newX / tileSize;
+                    const mapY = newY / tileSize;
+                    if (map[mapY] && map[mapY][mapX] !== 1) {
+                        enemyPositions[index].x = newX;
+                        enemyPositions[index].y = newY;
+                    }
+                }
+                if (Math.abs(enemyPositions[index].x - burgerX) < tileSize / 2 &&
+                    Math.abs(enemyPositions[index].y - burgerY) < tileSize / 2) {
+                    if (powerUpActive) {
+                        score += 100;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        createPointsOverlay(enemyPositions[index].x, enemyPositions[index].y);
+                        enemyPositions[index] = { ...initialEnemyPositions[index] };
+                        enemiesReleased[index] = false;
+                        setTimeout(() => {
+                            enemiesReleased[index] = true;
+                            console.log(`Enemy ${index + 1} respawned`);
+                        }, enemyReleaseTimes[index]);
+                        catmeowSound.currentTime = 0;
+                        catmeowSound.play().catch(e => console.error('Error playing power-up sound:', e));
+                    } else {
+                        lives--;
+                        livesDisplay.textContent = `Lives: ${lives}`;
+                        createPoofOverlay(enemyPositions[index].x, enemyPositions[index].y);
+                        heySound.currentTime = 0;
+                        heySound.play().catch(e => console.error('Error playing hey sound:', e));
+                        if (lives <= 0) {
+                            gameOver = true;
+							homeSound.currentTime = 0;
+							homeSound.play().catch(e => console.error('Error playing home sound:', e));
+                            createGameOverOverlay();
+                        } else {
+                            resetAfterDeath();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Spawn turtle at random valid position
+        function spawnTurtle() {
+            let validPosition = false;
+            let newX, newY;
+            while (!validPosition) {
+                newX = Math.floor(Math.random() * mapWidth) * tileSize;
+                newY = Math.floor(Math.random() * mapHeight) * tileSize;
+                const mapX = newX / tileSize;
+                const mapY = newY / tileSize;
+                if (map[mapY] && map[mapY][mapX] !== 1) {
+                    validPosition = true;
+                }
+            }
+            turtleX = newX;
+            turtleY = newY;
+            turtleActive = true;
+            updateTurtle();
+            console.log('Turtle spawned at:', turtleX, turtleY);
+        }
+
+        // Move turtle randomly
+        function moveTurtle() {
+            if (!turtleActive) return;
+            if (Math.random() < turtleSpeed) {
+                const directions = [
+                    { dx: tileSize, dy: 0 },
+                    { dx: -tileSize, dy: 0 },
+                    { dx: 0, dy: tileSize },
+                    { dx: 0, dy: -tileSize }
+                ];
+                const dir = directions[Math.floor(Math.random() * directions.length)];
+                const newX = turtleX + dir.dx;
+                const newY = turtleY + dir.dy;
+                const mapX = newX / tileSize;
+                const mapY = newY / tileSize;
+                if (map[mapY] && map[mapY][mapX] !== 1) {
+                    turtleX = newX;
+                    turtleY = newY;
+                    updateTurtle();
+                }
+            }
+        }
+
+        // Reset after death
+        function resetAfterDeath() {
+            burgerX = 9 * tileSize;
+            burgerY = 15 * tileSize;
+            enemyPositions = initialEnemyPositions.map(pos => ({ ...pos }));
+            enemiesReleased = [false, false, false, false];
+            powerUpActive = false;
+            enemiesPaused = false;
+            clearTimeout(powerUpTimer);
+            enemies.forEach((_, index) => {
+                setTimeout(() => { enemiesReleased[index] = true; }, enemyReleaseTimes[index]);
+            });
+            updateBurger();
+            updateEnemies();
+            updateTurtle();
+            console.log('Game reset after death');
+        }
+
+        // Check level completion
+        function checkLevelComplete() {
+            for (let y = 0; y < mapHeight; y++) {
+                for (let x = 0; x < mapWidth; x++) {
+                    if (map[y][x] === 2 || map[y][x] === 3) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Start new level
+        function startNewLevel() {
+            level++;
+            ghostSpeed += 0.01;
+            map = [
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,1],
+                [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+                [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+                [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+                [1,2,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1],
+                [1,2,2,2,2,1,2,2,2,2,2,2,2,2,2,2,2,2,1],
+                [1,1,1,1,2,1,1,1,1,1,1,1,1,1,2,1,1,1,1],
+                [1,2,2,2,2,2,2,2,1,0,0,1,2,2,2,2,2,2,1],
+                [1,2,1,1,1,1,1,2,1,0,0,1,2,1,1,1,1,2,1],
+                [1,2,2,2,2,2,2,2,2,5,2,2,2,2,2,2,2,2,1],
+                [1,1,1,1,2,1,1,1,1,1,1,1,1,1,2,1,1,1,1],
+                [1,2,2,2,2,2,2,2,2,4,2,2,2,2,2,2,2,2,1],
+                [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+                [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+                [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
+                [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+                [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+            ];
+            burgerX = 9 * tileSize;
+            burgerY = 15 * tileSize;
+            enemyPositions = initialEnemyPositions.map(pos => ({ ...pos }));
+            enemiesReleased = [false, false, false, false];
+            powerUpActive = false;
+            enemiesPaused = false;
+            clearTimeout(powerUpTimer);
+            enemies.forEach((_, index) => {
+                setTimeout(() => { enemiesReleased[index] = true; }, enemyReleaseTimes[index]);
+            });
+            prizeActive = false;
+            clearTimeout(prizeTimer);
+            schedulePrize();
+            specialPrizeActive = false;
+            clearTimeout(specialPrizeTimer);
+            scheduleSpecialPrize();
+            turtleActive = false;
+            clearTimeout(turtleTimer);
+            scheduleTurtle();
+            updateBurger();
+            updateEnemies();
+            updateTurtle();
+            console.log(`New level started: ${level}`);
+            respectSound.currentTime = 0;
+			createCopOverlay();
+            respectSound.play().catch(e => console.error('Error playing respect sound:', e));
+        }
+
+        // Schedule prize appearance
+        function schedulePrize() {
+            setTimeout(() => {
+                prizeActive = true;
+                map[12][9] = 4;
+                setTimeout(() => {
+                    prizeActive = false;
+                    map[12][9] = 0;
+                    schedulePrize();
+                }, 10000);
+            }, 15000);
+        }
+
+        // Schedule special prize appearance
+        function scheduleSpecialPrize() {
+            setTimeout(() => {
+                specialPrizeActive = true;
+				crashSound.currentTime = 0;
+				crashSound.play().catch(e => console.error('Error playing power-up sound:', e));
+                map[10][9] = 5;
+                setTimeout(() => {
+                    specialPrizeActive = false;
+                    map[10][9] = 0;
+                    scheduleSpecialPrize();
+                }, 10000);
+            }, 15000);
+        }
+
+        // Schedule turtle appearance
+        function scheduleTurtle() {
+            spawnTurtle();
+            turtleTimer = setTimeout(() => {
+                turtleActive = false;
+                updateTurtle();
+                scheduleTurtle();
+            }, 10000);
+        }
+
+        // Handle keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (gameOver) return;
+            let newX = burgerX;
+            let newY = burgerY;
+            if (e.key === 'ArrowRight') newX += tileSize;
+            if (e.key === 'ArrowLeft') newX -= tileSize;
+            if (e.key === 'ArrowDown') newY += tileSize;
+            if (e.key === 'ArrowUp') newY -= tileSize;
+
+            const mapX = newX / tileSize;
+            const mapY = newY / tileSize;
+            if (map[mapY] && map[mapY][mapX] !== 1) {
+                if (!checkEnemyCollision(newX, newY)) {
+                    burgerX = newX;
+                    burgerY = newY;
+                    if (map[mapY][mapX] === 2) {
+                        map[mapY][mapX] = 0;
+                        score += 10;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        pelletSound.currentTime = 0;
+                        pelletSound.play().catch(e => console.error('Error playing pellet sound:', e));
+                    } else if (map[mapY][mapX] === 3) {
+                        map[mapY][mapX] = 0;
+                        powerUpActive = true;
+                        enemiesPaused = false;
+                        clearTimeout(powerUpTimer);
+                        powerUpTimer = setTimeout(() => {
+                            powerUpActive = false;
+                            enemiesPaused = false;
+                        }, 10000);
+                        score += 100;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        burpSound.currentTime = 0;
+                        burpSound.play().catch(e => console.error('Error playing power-up sound:', e));
+                    } else if (map[mapY][mapX] === 4 && prizeActive) {
+                        map[mapY][mapX] = 0;
+                        prizeActive = false;
+                        score += 100;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        createPointsOverlay(newX, newY);
+                        specialPrizeSound.currentTime = 0;
+                        specialPrizeSound.play().catch(e => console.error('Error playing power-up sound:', e));
+                        clearTimeout(prizeTimer);
+                        schedulePrize();
+                    } else if (map[mapY][mapX] === 5 && specialPrizeActive) {
+                        map[mapY][mapX] = 0;
+                        specialPrizeActive = false;
+                        let enemiesKilled = 0;
+                        enemies.forEach((_, index) => {
+                            if (enemiesReleased[index]) {
+                                enemiesKilled++;
+                                enemyPositions[index] = { ...initialEnemyPositions[index] };
+                                enemiesReleased[index] = false;
+                                createPointsOverlay(enemyPositions[index].x, enemyPositions[index].y);
+                                setTimeout(() => {
+                                    enemiesReleased[index] = true;
+                                }, enemyReleaseTimes[index]);
+                            }
+                        });
+                        score += enemiesKilled * 100;
+                        lives++;
+                        livesDisplay.textContent = `Lives: ${lives}`;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        dogbarkSound.currentTime = 0;
+                        dogbarkSound.play().catch(e => console.error('Error playing special-prize sound:', e));
+                        clearTimeout(specialPrizeTimer);
+                        scheduleSpecialPrize();
+                    }
+                    // Check for turtle collision
+                    if (turtleActive && Math.abs(burgerX - turtleX) < tileSize / 2 && Math.abs(burgerY - turtleY) < tileSize / 2) {
+                        turtleActive = false;
+                        score += 100;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        createPointsOverlay(turtleX, turtleY);
+                        ballsSound.currentTime = 0;
+                        ballsSound.play().catch(e => console.error('Error playing balls sound:', e));
+                        clearTimeout(turtleTimer);
+                        setTimeout(() => {
+                            scheduleTurtle();
+                        }, 100);
+                    }
+                    updateBurger();
+                    if (checkLevelComplete()) {
+                        startNewLevel();
+                    }
+                }
+            }
+        });
+
+        // Game loop
+        function gameLoop() {
+            if (!gameOver) {
+                drawMap();
+                updateEnemies();
+                moveEnemies();
+                moveTurtle();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Function to start the game
+        function startGame() {
+            startScreen.style.display = 'none';
+            enemies.forEach((_, index) => {
+                setTimeout(() => {
+                    enemiesReleased[index] = true;
+                    console.log(`Enemy ${index + 1} released`);
+                }, enemyReleaseTimes[index]);
+            });
+            schedulePrize();
+            scheduleSpecialPrize();
+            scheduleTurtle();
+			createStartGameOverlay();
+            startSound.play().catch(e => console.error('Error playing start sound:', e));
+			hippySound.play().catch(e => console.error('Error playing hippy sound:', e));
+            gameLoop();
+        }
+
+        // Initialize game
+        console.log('Game initialized');
+        drawMap();
+        updateBurger();
+        updateEnemies();
+        updateTurtle();
+        document.addEventListener('keydown', startGame, { once: true });
+    </script>
+</body>
+</html>
